@@ -1,3 +1,15 @@
+// add score variable, starting at 0, increase based on whatever
+
+// Check for collision between player and obstacles
+// destroy obstacle on collision with player
+// lower score
+
+// check for collision between player and enemy
+// reduce health
+// lower score
+
+// have a look at getting enemy to follow player
+
 let game
 let gameConfig
 let background
@@ -28,11 +40,19 @@ let lanesCurrently = [];
 let myLane;
 let lane;
 let vehicleGroup;
+let enemyGroup;
+let enemySpawned = false;
 
 let spawnEvenConfig =
 {
-    delay: 500,
-    callback: vehicleSpawn,
+    delay: 5000,
+    callback: spawnObstacleVehicles,
+    repeat: -1
+}
+
+let spawnEnemyConfig = {
+    delay: 5000,
+    callback: spawnEnemy,
     repeat: -1
 }
 
@@ -94,8 +114,8 @@ function preload() {
     currentScene.load.image("MotorbikeG", "images/motorcycle_green.png");
 
     currentScene.load.image("FishVan", "images/FishChips.png")
-    //    currentScene.load.spritesheet("Fishvan", "images/FishChips_sprite.png", 
-    //    {frameWidth:101, frameHeight:202});
+    // currentScene.load.spritesheet("Fishvan", "images/FishChips_sprite.png", 
+    // {frameWidth:101, frameHeight:202});
 
 
 
@@ -125,6 +145,7 @@ function StartGame() {
 
 
     vehicleGroup = currentScene.physics.add.group()
+    enemyGroup = currentScene.physics.add.group()
     // bikeGroup = currentScene.physics.add.group()
     //add a group for the world edeges and have it stay put with physics
     worldEdges = currentScene.physics.add.staticGroup()
@@ -144,7 +165,9 @@ function StartGame() {
 
     //car one works but bike one doesnt
     currentScene.physics.add.overlap(bottomEdge, vehicleGroup, DestroyVehicle)
+    currentScene.physics.add.overlap(bottomEdge, enemyGroup, DestroyVehicle)
     currentScene.time.addEvent(spawnEvenConfig)
+    currentScene.time.addEvent(spawnEnemyConfig)
 
 }
 
@@ -247,44 +270,62 @@ function InitialisePlayer() {
 
 }
 
-function vehicleSpawn() {
+function spawnEnemy() {
+    if(!enemySpawned){
+        let enemy = vehicleSpawn("FishVan");
+        //enemySpawned = true;
 
-    // Random number between 0 - 1
-    let carOrBikeRandomiser = Phaser.Math.Between(0,1);
-
-    // declare empty string to assign car or bike name to
-    let carOrBike = "";
-
-    // set either car or bike depending on randomiser
-    if(carOrBikeRandomiser === 0){
-        carOrBike = "MotorbikeG";
+        if(enemy != null) {
+            vehicleGroup.add(enemy);
+            enemy.setVelocityY(100);
+        }
     }
-    else if (carOrBikeRandomiser === 1 ){
-        carOrBike = "car";
+}
+
+function spawnObstacleVehicles(){
+       // Random number between 0 - 1
+       let carOrBikeRandomiser = Phaser.Math.Between(0,1);
+
+       // declare empty string to assign car or bike name to
+       let carOrBike = "";
+   
+       // set either car or bike depending on randomiser
+       if(carOrBikeRandomiser === 0){
+           carOrBike = "MotorbikeG";
+       }
+       else if (carOrBikeRandomiser === 1 ){
+           carOrBike = "car";
+       }
+
+    let newVehicle = vehicleSpawn(carOrBike);
+
+
+    if(newVehicle != null){
+        vehicleGroup.add(newVehicle);
+        newVehicle.setVelocityY(100);
+        let randomColor = Phaser.Math.Between(0x000000, 0xFFFFFF);
+        newVehicle.setTint(randomColor);
     }
+}
+
+function vehicleSpawn(vehicleType) {
     // generate random lane number
     let laneNumber = Phaser.Math.Between(0, 3);
 
     if (laneOccupation[laneNumber] == true) {
-        return;
+        return null;
     }
 
-    // if not, spawn car in the lane
-    else {
-        // use randomised car or bike name
-        newVehicle = currentScene.physics.add.image(spawnPoint[laneNumber], 100, carOrBike);
-        newVehicle.myLane = laneNumber
-        laneOccupation[laneNumber] = true
-    }
+    newVehicle = currentScene.physics.add.image(spawnPoint[laneNumber], 100, vehicleType);
+    newVehicle.myLane = laneNumber
+    laneOccupation[laneNumber] = true
 
-    vehicleGroup.add(newVehicle);
-    newVehicle.setVelocityY(100);
+
     newVehicle.setSize(100, 200, true)
     newVehicle.setScale(0.5);
-    let randomColor = Phaser.Math.Between(0x000000, 0xFFFFFF);
-    newVehicle.setTint(randomColor);
     newVehicle.body.allowGravity = false;
 
+    return newVehicle;
 }
 
 
