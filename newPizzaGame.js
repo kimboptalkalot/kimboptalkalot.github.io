@@ -95,12 +95,7 @@ function create() {
     worldEdges.add(topEdge)
 
     currentScene.physics.add.collider(player, worldEdges)
-
-
-
-    spawnLane1()
-    spawnLane2()
-    spawnLane3()
+    currentScene.physics.add.collider(player, vehicleGroup)
 
 }
 
@@ -136,23 +131,6 @@ function update() {
         player.setVelocityY(0);
         player.anims.play("straight");
     }
-
-    if (car1.y > 600) {
-        car1.y = 0
-        car1.x = 228
-    }
-
-    if (bike.y > 600) {
-        bike.y = 0
-        bike.x = 348
-    }
-    if (car2.y > 600) {
-        car2.y = 0
-        car2.x = 478
-    }
-
-
-    // why are car and bike spawning at same places instead of randomX
 
 }
 
