@@ -1,49 +1,32 @@
-//https://learn.adafruit.com/re-makecode-the-classics-spy-hunter?view=all#setup-and-mechanics
-
-
-
-//added playerhealth
-// need to add score variable, starting at 0, increase based on defeating fish van and surviving
-
-// Check for collision between player and obstacles
-// destroy obstacle on collision with player
-// lower score
-
-// check for collision between player and enemy
-// reduce health
-// lower score
-
-// have a look at getting enemy to follow player
-
 let game
 let gameConfig
 let background
 let pizzaText
+let backButton
 let gameState = 0;
-let startUI, scoreUI, endUI, healthUI
+let startUI, scoreUI, endUI, healthUI, instructionsUI, tryAgainUI, menuUI
 let score;
-let gameTimer = 0;
 let playerHealth;
 let worldEdges
 let leftEdge
 let rightEdge
 let bottomEdge
-
 let player
-let newCar
-let newBike
 let FishVan
 let newVehicle
 let pizzaGroup
-
+let enemyCollisionCoolDownCounter = 0;
+let pizzaThrowCoolDownTimer = 0;
+let explosion
+let explosionGroup
+let gameOverFX
+let explodeFX
 let roadOne
 let roadTwo
 let roadGroup
 let currentScene;
-
 const spawnPoint = [228, 348, 478, 608];
 let laneOccupation = [false, false, false, false];
-
 let lanesCurrently = [];
 let myLane;
 let type;
@@ -52,22 +35,19 @@ let vehicleGroup;
 let enemyGroup;
 let enemySpawned = false;
 let enemySpeed = 0.8;
-
+let spawnVehicleEvent;
+let spawnEnemyEvent;
 let spawnVehicleConfig = {
-    delay: 5000,
+    delay: 1000,
     callback: spawnObstacleVehicles,
     repeat: -1
 }
 
 let spawnEnemyConfig = {
-    delay: 5000,
+    delay: 2000,
     callback: spawnEnemy,
     repeat: -1
 }
-
-let spawnVehicleEvent;
-let spawnEnemyEvent;
-
 
 let gameSettings = {
     roadSpeed: 200,
@@ -89,6 +69,12 @@ let h1textConfig = {
     stroke: "#000"
 }
 
+let instructionsTextConfig = {
+    fontFamily: "Century Gothic",
+    fontSize: "30px",
+    strokeThickness: 2,
+}
+
 window.onload = function () {
     gameConfig = {
         width: 840,
@@ -100,7 +86,7 @@ window.onload = function () {
                 gravity: {
                     y: 0
                 },
-                debug: true
+                debug: false,
 
             }
         },
@@ -116,9 +102,7 @@ window.onload = function () {
 function preload() {
     currentScene = this;
     currentScene.load.image("road", "images/road.png");
-    currentScene.load.image("car", "images/Car_Monochrome.png");
-    currentScene.load.image("car2", "images/Black_viper.png");
-    currentScene.load.image("car3", "images/Car.png");
+    currentScene.load.image("car", "images/Car_Monochrome.png")
     currentScene.load.spritesheet("player", "images/Pizza_vanEDITED.png", {
         frameWidth: 109,
         frameHeight: 210
@@ -127,19 +111,24 @@ function preload() {
     currentScene.load.image("FishVan", "images/FishChips.png")
     currentScene.load.image("RoadUI", "images/Toon Road Texture.png")
     currentScene.load.image("pizza", "images/pizza1.png")
-
+    currentScene.load.image("explosion", "images/fire.png")
+    currentScene.load.audio("gameOver", "sounds/gameOver.mp3")
+    currentScene.load.audio("explode", "sounds/explosion1.mp3")
+    currentScene.load.audio("backMusic", "sounds/backMusic.mp3")
 
 }
 
 function create() {
     InitialiseStartUI()
     currentScene.input.on("pointerdown", playerTap)
+    gameOverFX = currentScene.sound.add("gameOver")
+    explodeFX = currentScene.sound.add("explode")
+    backFX = currentScene.sound.add("backMusic")
 }
 
 function StartGame() {
-
-
-
+    backFX.play()
+    backFX.setLoop(true)
     //calls function to move the road
     roadOne = UpdateRoad()
     roadTwo = UpdateRoad()
@@ -156,10 +145,10 @@ function StartGame() {
     worldEdges = currentScene.physics.add.staticGroup()
 
     //add rectangles to current scene
-    leftEdge = currentScene.add.rectangle(95, 600, 20, 1200, 0x000000)
-    rightEdge = currentScene.add.rectangle(750, 600, 20, 1200, 0x000000)
-    bottomEdge = currentScene.add.rectangle(600, 640, 1200, 20, 0x000000)
-    topEdge = currentScene.add.rectangle(600, 10, 1200, 20, 0x000000)
+    leftEdge = currentScene.add.rectangle(95, 600, 20, 1200)
+    rightEdge = currentScene.add.rectangle(750, 600, 20, 1200)
+    bottomEdge = currentScene.add.rectangle(600, 640, 1200, 20)
+    topEdge = currentScene.add.rectangle(600, 10, 1200, 20)
 
     //add the edges to a group called world edges when this is added it breaks
     worldEdges.add(leftEdge)
@@ -177,30 +166,35 @@ function StartGame() {
     //overlap between the bottom edge, the vehicles group and function destroy vehicle 
     //this will delete images after leaving lane so another image can spawn
     currentScene.physics.add.overlap(bottomEdge, vehicleGroup, DestroyVehicle)
-    //create overlap between player and edges 
     currentScene.physics.add.overlap(leftEdge, player, gameOver);
     currentScene.physics.add.overlap(rightEdge, player, gameOver);
-
-    //add events for spawning cars and enemies
-    spawnVehicleEvent = currentScene.time.addEvent(spawnVehicleConfig)
-    spawnEnemyEvent = currentScene.time.addEvent(spawnEnemyConfig)
-    //add overlap between the vehicle group, the player and call gotContact to destroy the vehicle
     currentScene.physics.add.overlap(player, vehicleGroup, gotContact)
     currentScene.physics.add.overlap(pizzaGroup, vehicleGroup, pizzaContact)
     currentScene.physics.add.overlap(pizzaGroup, enemyGroup, pizzaContact)
     currentScene.physics.add.overlap(pizzaGroup, topEdge, destroyPizza)
     // currentScene.physics.add.overlap(worldEdges, enemyGroup, DestroyVehicle)
-
+    //add events for spawning cars and enemies
+    spawnVehicleEvent = currentScene.time.addEvent(spawnVehicleConfig)
+    spawnEnemyEvent = currentScene.time.addEvent(spawnEnemyConfig)
     playerHealth = 100;
     score = 0;
 
+    gameState = 1;
+    InitialiseScoreUI();
 
-    // create function to fire on collision between enemy and player
-    // reduce player healthy by 1 ech collision
-    // reduce player x velocity if enemy hits players right side, increase for hits on left (
-    // if collision, check if enemy x > player x, if so enemy is on right. Inverse for on left
-    //)
 
+    // destroy buttons
+    if(tryAgainUI != null){
+        tryAgainUI.destroy();
+    }
+    if(menuUI != null){
+        menuUI.destroy();
+    }
+    if(backButton != null){
+      backButton.destroy();
+    }
+    startUI.destroy();
+    instructionsUI.destroy();
 }
 
 function update() {
@@ -233,15 +227,21 @@ function update() {
         } else if (cursors.down.isDown) {
             player.setVelocityY(160)
             player.anims.play("straight");
-        } else {
+            // if enemy hasnt hit player - velocity as normal
+        } else if (enemyCollisionCoolDownCounter == 0) {
             player.setVelocityX(0);
             player.setVelocityY(0);
             player.anims.play("straight");
         }
 
-        if (enemySpawned && pizzaGroup.countActive(true) == 0) {
+        if (cursors.space.isDown) {
+            console.log("Space bar throw")
+            throwPizza();
+        }
+
+        if (enemySpawned) {
             if (player.x >= FishVan.x - 20 && player.x <= FishVan.x + 20 && player.y > FishVan.y) {
-                throwPizza();
+               throwPizza();
             }
         }
         if (enemySpawned) {
@@ -251,8 +251,8 @@ function update() {
             } else if (player.x > FishVan.x) {
                 FishVan.setVelocityX(FishVan.body.velocity.x + enemySpeed)
             }
-            
-            if (player.x >= FishVan.x - 10 && player.x <= FishVan.x + 10){
+
+            if (player.x >= FishVan.x - 10 && player.x <= FishVan.x + 10) {
                 FishVan.setVelocityX(0)
             }
 
@@ -262,12 +262,19 @@ function update() {
                 FishVan.setVelocityY(FishVan.body.velocity.y + enemySpeed)
             }
 
-            if (player.y >= FishVan.y - 10 && player.y <= FishVan.y + 10){
+            if (player.y >= FishVan.y - 10 && player.y <= FishVan.y + 10) {
                 FishVan.setVelocityY(0)
             }
         }
     }
 
+    if (enemyCollisionCoolDownCounter > 0) {
+        enemyCollisionCoolDownCounter--;
+    }
+
+    if (pizzaThrowCoolDownTimer > 0) {
+        pizzaThrowCoolDownTimer--;
+    }
 
 }
 
@@ -339,9 +346,10 @@ function InitialisePlayer() {
 function spawnEnemy() {
     if (!enemySpawned) {
         let enemy = vehicleSpawn("FishVan");
-
+        console.log("First enemy check: " + enemy)
 
         if (enemy != null) {
+            console.log("Second enemy check: " + enemy)
             FishVan = enemy
             enemyGroup.add(enemy);
             enemy.setVelocityY(100);
@@ -377,6 +385,7 @@ function spawnObstacleVehicles() {
 }
 
 function vehicleSpawn(vehicleType) {
+    console.log("vehicle spawned, type: " + vehicleType)
     // generate random lane number
     let laneNumber = Phaser.Math.Between(0, 3);
     //check is the lane free - if it is then add true to laneNumber if not return null
@@ -399,6 +408,21 @@ function vehicleSpawn(vehicleType) {
     return newVehicle;
 }
 
+function spawnExplosion(x, y) {
+    explosion = currentScene.physics.add.staticImage(x, y, "explosion")
+    explosion.alpha = 0.5
+    explosion.setScale(0.5)
+
+    const explosionGroupConfig = {
+        targets: explosion,
+        alpha: 0,
+        onComplete: function destroyExplosion() {
+            explosion.destroy();
+        }
+    }
+
+    currentScene.tweens.add(explosionGroupConfig)
+}
 //this function will destroy the vehicles when it overlaps with the edge, clearing a 
 //space in lane for next spawned car
 function DestroyVehicle(edge, vehicle) {
@@ -410,16 +434,44 @@ function DestroyVehicle(edge, vehicle) {
 }
 
 function InitialiseStartUI() {
+
     //add background for start UI
     background = currentScene.add.image(gameConfig.width / 2, gameConfig.height / 2, "road")
-    //add text to start screen that will show instrustions and "click to start"
+    //add text to start screen that will show instructions and "click to start"
     currentScene.add.text(200, 200, "PIZZA SPY!!", h1textConfig)
     startUI = currentScene.add.text(250, 350, "Click to start", textConfig)
+    startUI.setInteractive({
+        useHandCursor: true
+    })
+    startUI.on("pointerdown", StartGame)
+    instructionsUI = currentScene.add.text(270, 420, "Instructions", textConfig)
+    instructionsUI.setInteractive({
+        useHandCursor: true
+    })
+    instructionsUI.on("pointerdown", Instructions)
+}
+
+function Instructions() {
+    background = currentScene.add.image(gameConfig.width / 2, gameConfig.height / 2, "road")
+    backButton = currentScene.add.text(16, 50, "Back", textConfig)
+    backButton.setInteractive({
+        useHandCursor: true
+    })
+    backButton.on("pointerdown", InitialiseStartUI)
+    instructionsUI.destroy()
+    startUI.destroy()
+
+    currentScene.add.text(200, 50, "PIZZA SPY!!", h1textConfig)
+    currentScene.add.rectangle(200, 330, 1600, 300, 0x6EC07B)
+    currentScene.add.text(50, 200, "Use the arrow keys to guide your pizza truck through", instructionsTextConfig)
+    currentScene.add.text(50, 250, "traffic for as long as possible.", instructionsTextConfig)
+    currentScene.add.text(50, 300, "Avoid moving cars and motorbikes.", instructionsTextConfig)
+    currentScene.add.text(50, 350, "Use space button to shoot pizza.", instructionsTextConfig)
+    currentScene.add.text(50, 400, "Watch out! another food truck may try to stop you!", instructionsTextConfig)
 }
 
 function InitialiseScoreUI() {
     //while playing the game, show the score and the health of the player
-    //scoreUI = currentScene.add.text(350, 600, "Score: " + score, textConfig)
     scoreUI = currentScene.add.text(16, 16, "Score: " + score, textConfig)
     healthUI = currentScene.add.text(16, 100, "Player Health: " + playerHealth + "%", textConfig)
 }
@@ -428,71 +480,133 @@ function InitialiseEndUI() {
     //once game is over, show text that says "game over"
     background = currentScene.add.image(gameConfig.width / 2, gameConfig.height / 2, "road")
     endUI = currentScene.add.text(200, 300, "Game Over!", h1textConfig)
+    tryAgainUI = currentScene.add.text(300, 400, "Try Again?", textConfig)
+    tryAgainUI.setInteractive({
+        useHandCursor: true
+    })
+    tryAgainUI.on("pointerdown", StartGame)
+    menuUI = currentScene.add.text(350, 500, "Menu", textConfig)
+    menuUI.setInteractive({
+        useHandCursor: true
+    })
+    menuUI.on("pointerdown", InitialiseStartUI)
 }
 
 function playerTap() {
-    if (gameState == 0) {
-        StartGame();
-        InitialiseScoreUI()
-        gameState = 1
-    } else if (gameState == 1) {
-        throwPizza()
-    } else if (gameState == 2) {
-        worldEdges.destroy();
+    // if (gameState == 0) {
+    //     StartGame();
+    //     InitialiseScoreUI();
+    //     gameState = 1
+    // } else
+    // if (gameState == 1) {
+    //     throwPizza()}
+    if (gameState == 2) {
+        //worldEdges.destroy();
         //background.destroy();
         endUI.destroy();
         InitialiseStartUI();
-
         gameState = 0;
     }
 }
 
 function throwPizza() {
-    newPizza = currentScene.physics.add.image(player.x, player.y, "pizza")
-    pizzaGroup.add(newPizza)
-    newPizza.setVelocityY(-100)
-    newPizza.setScale(0.1)
+    if (pizzaThrowCoolDownTimer == 0) {
+        pizzaThrowCoolDownTimer = 60;
+        newPizza = currentScene.physics.add.image(player.x, player.y, "pizza")
+        pizzaGroup.add(newPizza)
+        newPizza.setVelocityY(-100)
+        newPizza.setScale(0.1)
 
+        console.log("Auto throw - Enemy x: " + FishVan.x + " Player x: " + player.x);
+        console.log("Enemy spawned: " + enemySpawned);
+        console.log("Enemy lane: " + FishVan.myLane);
+        console.log("Lanes - " + laneOccupation);
+    }
 }
 
 function pizzaContact(pizza, vehicle) {
+    //destroy pizza image when off screen
     pizza.destroy()
+    //set to 0 
+    let scoreChange = 0
     if (vehicle.type == "FishVan") {
-        score += 100
+        //if the vehicle type is a fish van, use scorechange to add 100
+        scoreChange = 100;
     } else {
-        score -= 100
-
+        //else, -50 as we dont want to hit motorbikes/cars with pizzas
+        scoreChange = 50;
     }
-    scoreUI.setText("score: " + score)
-    DestroyVehicle(null, vehicle);
+    //call the function contact vehicle to link the type of vehicle with
+    //what we want the score to do
+    contactVehicle(vehicle, scoreChange);
 }
 
+//this deletes the pizza image from screen
 function destroyPizza(edge, pizza) {
     pizza.destroy()
 }
+
+function contactVehicle(vehicle, scoreChange) {
+    //if the vehicle is a fish van, add score, if motorbike, minus score
+    //if its a car then end game
+    if (vehicle.type == "FishVan") {
+        score += scoreChange
+    } else {
+        score -= scoreChange;
+    }
+
+    scoreUI.setText("score: " + score);
+    spawnExplosion(vehicle.x, vehicle.y);
+    DestroyVehicle(null, vehicle);
+    explodeFX.play()
+
+    if (vehicle.type == "car") {
+        gameOver()
+        return;
+    }
+}
+
 //deletes vehicle on contact and stops game
 function gotContact(player, vehicle) {
-    score -= 10;
-    playerHealth -= 10;
+    lowerPlayerHealth(10)
+    contactVehicle(vehicle, 10)
+}
+
+//function that takes in health parameter and takes away health or ends game
+//if health goes past 0
+//also sets UI health text to say what the player health currently is
+function lowerPlayerHealth(health) {
+    playerHealth -= health
+    if (playerHealth <= 0) {
+        gameOver()
+    }
     healthUI.setText("Player Health: " + playerHealth + "%");
-    scoreUI.setText("score: " + score);
-
-    // if (vehicle.type == "car") {
-    //     gameOver()
-    //     return;
-    // }
-
-    DestroyVehicle(null, vehicle);
-
 }
 
-function enemyCollision(){
-    console.log("collide")
+function enemyCollision() {
+    //this counter will stop collider for one second so that there are not lots of
+    //hits, and decreases points every 1 second
+    if (enemyCollisionCoolDownCounter == 0) {
+        let playerXV = player.body.velocity.x
+        enemyCollisionCoolDownCounter = 60;
+        score -= 10
+        lowerPlayerHealth(20)
+
+        scoreUI.setText("score: " + score);
+        //if the enemys x is more than player - rammed to right
+        if (FishVan.x > player.x) {
+            player.setVelocityX(playerXV - 50)
+        }
+        //if the enemys x is less than player - rammed to left
+        else if (FishVan.x < player.x) {
+            player.setVelocityX(playerXV + 50)
+        }
+    }
 }
 
-
-// When player dies/health = 0 call this function
 function gameOver() {
+    gameOverFX.play()
+    backFX.stop()
     player.destroy();
     roadOne.destroy();
     roadTwo.destroy();
