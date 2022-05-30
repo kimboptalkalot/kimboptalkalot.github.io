@@ -385,7 +385,6 @@ function spawnObstacleVehicles() {
 }
 
 function vehicleSpawn(vehicleType) {
-    console.log("vehicle spawned, type: " + vehicleType)
     // generate random lane number
     let laneNumber = Phaser.Math.Between(0, 3);
     //check is the lane free - if it is then add true to laneNumber if not return null
@@ -616,4 +615,11 @@ function gameOver() {
     spawnEnemyEvent.remove(false);
     InitialiseEndUI();
     gameState = 2;
+
+    if(enemySpawned){
+        FishVan.destroy();
+        enemySpawned = false;
+    }
+
+    laneOccupation = [false, false, false, false]
 }
