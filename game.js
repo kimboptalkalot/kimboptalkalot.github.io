@@ -120,7 +120,6 @@ function preload() {
 
 function create() {
     InitialiseStartUI()
-    currentScene.input.on("pointerdown", playerTap)
     gameOverFX = currentScene.sound.add("gameOver")
     explodeFX = currentScene.sound.add("explode")
     backFX = currentScene.sound.add("backMusic")
@@ -190,9 +189,7 @@ function StartGame() {
     if(menuUI != null){
         menuUI.destroy();
     }
-    if(backButton != null){
-      backButton.destroy();
-    }
+    
     startUI.destroy();
     instructionsUI.destroy();
 }
@@ -235,7 +232,6 @@ function update() {
         }
 
         if (cursors.space.isDown) {
-            console.log("Space bar throw")
             throwPizza();
         }
 
@@ -346,10 +342,8 @@ function InitialisePlayer() {
 function spawnEnemy() {
     if (!enemySpawned) {
         let enemy = vehicleSpawn("FishVan");
-        console.log("First enemy check: " + enemy)
 
         if (enemy != null) {
-            console.log("Second enemy check: " + enemy)
             FishVan = enemy
             enemyGroup.add(enemy);
             enemy.setVelocityY(100);
@@ -433,7 +427,9 @@ function DestroyVehicle(edge, vehicle) {
 }
 
 function InitialiseStartUI() {
-
+    if(backButton != null){
+        backButton.destroy();
+    }
     //add background for start UI
     background = currentScene.add.image(gameConfig.width / 2, gameConfig.height / 2, "road")
     //add text to start screen that will show instructions and "click to start"
@@ -491,23 +487,6 @@ function InitialiseEndUI() {
     menuUI.on("pointerdown", InitialiseStartUI)
 }
 
-function playerTap() {
-    // if (gameState == 0) {
-    //     StartGame();
-    //     InitialiseScoreUI();
-    //     gameState = 1
-    // } else
-    // if (gameState == 1) {
-    //     throwPizza()}
-    if (gameState == 2) {
-        //worldEdges.destroy();
-        //background.destroy();
-        endUI.destroy();
-        InitialiseStartUI();
-        gameState = 0;
-    }
-}
-
 function throwPizza() {
     if (pizzaThrowCoolDownTimer == 0) {
         pizzaThrowCoolDownTimer = 60;
@@ -515,11 +494,6 @@ function throwPizza() {
         pizzaGroup.add(newPizza)
         newPizza.setVelocityY(-100)
         newPizza.setScale(0.1)
-
-        console.log("Auto throw - Enemy x: " + FishVan.x + " Player x: " + player.x);
-        console.log("Enemy spawned: " + enemySpawned);
-        console.log("Enemy lane: " + FishVan.myLane);
-        console.log("Lanes - " + laneOccupation);
     }
 }
 
@@ -546,22 +520,24 @@ function destroyPizza(edge, pizza) {
 }
 
 function contactVehicle(vehicle, scoreChange) {
-    //if the vehicle is a fish van, add score, if motorbike, minus score
-    //if its a car then end game
-    if (vehicle.type == "FishVan") {
-        score += scoreChange
-    } else {
-        score -= scoreChange;
-    }
+    if(gameState === 1){
+        //if the vehicle is a fish van, add score, if motorbike, minus score
+        //if its a car then end game
+        if (vehicle.type == "FishVan") {
+            score += scoreChange
+        } else if(score > 0) {
+            score -= scoreChange;
+        }
 
-    scoreUI.setText("score: " + score);
-    spawnExplosion(vehicle.x, vehicle.y);
-    DestroyVehicle(null, vehicle);
-    explodeFX.play()
+        scoreUI.setText("score: " + score);
+        spawnExplosion(vehicle.x, vehicle.y);
+        DestroyVehicle(null, vehicle);
+        explodeFX.play()
 
-    if (vehicle.type == "car") {
-        gameOver()
-        return;
+        if (vehicle.type == "car") {
+            gameOver()
+            return;
+        }
     }
 }
 
@@ -577,8 +553,10 @@ function gotContact(player, vehicle) {
 function lowerPlayerHealth(health) {
     playerHealth -= health
     if (playerHealth <= 0) {
-        gameOver()
+        gameOver();
+        return;
     }
+
     healthUI.setText("Player Health: " + playerHealth + "%");
 }
 
@@ -588,17 +566,22 @@ function enemyCollision() {
     if (enemyCollisionCoolDownCounter == 0) {
         let playerXV = player.body.velocity.x
         enemyCollisionCoolDownCounter = 60;
-        score -= 10
+        if(score > 0){
+            score -= 10
+        }
         lowerPlayerHealth(20)
 
-        scoreUI.setText("score: " + score);
-        //if the enemys x is more than player - rammed to right
-        if (FishVan.x > player.x) {
-            player.setVelocityX(playerXV - 50)
-        }
-        //if the enemys x is less than player - rammed to left
-        else if (FishVan.x < player.x) {
-            player.setVelocityX(playerXV + 50)
+        // makes sure game didn't end in lowerPlayerHealth before trying to do anything else
+        if(gameState === 1) {
+            scoreUI.setText("score: " + score);
+            //if the enemys x is more than player - rammed to right
+            if (FishVan.x > player.x) {
+                player.setVelocityX(playerXV - 50)
+            }
+            //if the enemys x is less than player - rammed to left
+            else if (FishVan.x < player.x) {
+                player.setVelocityX(playerXV + 50)
+            }
         }
     }
 }
